@@ -20,4 +20,5 @@ class IshikoroApp extends StatelessWidget {
       home: const SplashScreen(),
     );
   }
+  //test
 }
