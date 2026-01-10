@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'capture_screen.dart';
 
 class TutorialScreen extends StatelessWidget {
   const TutorialScreen({super.key});
@@ -79,8 +80,13 @@ class TutorialScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 40),
                 child: ElevatedButton(
                   onPressed: () {
-                    // 次の画面へ遷移
-                  },
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                    builder: (context) => const CaptureScreen(),
+                    ),
+                  );
+                 },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD4CFC8),
                     foregroundColor: const Color(0xFF6A6A6A),
