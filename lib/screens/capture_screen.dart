@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../services/remove_bg_service.dart';
 
 class CaptureScreen extends StatefulWidget {
   const CaptureScreen({super.key});
@@ -11,7 +12,9 @@ class CaptureScreen extends StatefulWidget {
 
 class _CaptureScreenState extends State<CaptureScreen> {
   File? _imageFile;
+  File? _processedImageFile; // 背景除去後の画像
   final ImagePicker _picker = ImagePicker();
+  bool _isProcessing = false; // 処理中フラグ
 
   // カメラで撮影
   Future<void> _takePicture() async {
@@ -24,7 +27,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       setState(() {
         _imageFile = File(photo.path);
       });
-      // TODO: 次の画面（顔を描く画面）へ遷移
+      await _processImage(File(photo.path));
     }
   }
 
@@ -39,17 +42,73 @@ class _CaptureScreenState extends State<CaptureScreen> {
       setState(() {
         _imageFile = File(image.path);
       });
-      // TODO: 次の画面（顔を描く画面）へ遷移
+      await _processImage(File(image.path));
+    }
+  }
+
+  // 背景除去処理
+  Future<void> _processImage(File imageFile) async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      // 背景除去サービスを呼び出す
+      final processedFile = await RemoveBgService.removeBackground(imageFile);
+      
+      setState(() {
+        _processedImageFile = processedFile ?? imageFile;
+        _isProcessing = false;
+      });
+
+      // 成功時のメッセージ
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              processedFile != null ? '背景除去が完了しました！' : '背景除去に失敗しました',
+            ),
+            backgroundColor: processedFile != null 
+                ? const Color(0xFF9E8B7E) 
+                : Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+
+      // TODO: 成功したら次の画面（顔を描く画面）へ自動遷移
+      // if (processedFile != null) {
+      //   Navigator.push(
+      //     context,
+      //     MaterialPageRoute(
+      //       builder: (context) => DrawFaceScreen(imageFile: processedFile),
+      //     ),
+      //   );
+      // }
+
+    } catch (e) {
+      setState(() {
+        _isProcessing = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('エラーが発生しました: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
   @override
   void initState() {
     super.initState();
-    // 画面表示と同時にカメラを起動
-    Future.delayed(Duration.zero, () {
-      _takePicture();
-    });
   }
 
   @override
@@ -112,11 +171,44 @@ class _CaptureScreenState extends State<CaptureScreen> {
                           ],
                         ),
                         child: _imageFile != null
-                            ? ClipOval(
-                                child: Image.file(
-                                  _imageFile!,
-                                  fit: BoxFit.cover,
-                                ),
+                            ? Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ClipOval(
+                                    child: Image.file(
+                                      _processedImageFile ?? _imageFile!,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  // 処理中のオーバーレイ
+                                  if (_isProcessing)
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.black.withOpacity(0.6),
+                                      ),
+                                      child: const Center(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 3,
+                                            ),
+                                            SizedBox(height: 16),
+                                            Text(
+                                              '背景を除去中...',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               )
                             : Center(
                                 child: Column(
@@ -153,9 +245,11 @@ class _CaptureScreenState extends State<CaptureScreen> {
                           color: Colors.white.withOpacity(0.7),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Text(
-                          '石を円の中央に配置してください',
-                          style: TextStyle(
+                        child: Text(
+                          _isProcessing 
+                              ? '少々お待ちください...'
+                              : '石を円の中央に配置してください',
+                          style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF6D5D52),
                             letterSpacing: 1,
@@ -176,7 +270,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: _takePicture,
+                        onPressed: _isProcessing ? null : _takePicture,
                         icon: const Icon(Icons.camera_alt, size: 24),
                         label: const Text(
                           'カメラで撮影',
@@ -189,6 +283,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFBCAAA4),
                           foregroundColor: Colors.white,
+                          disabledBackgroundColor: const Color(0xFFD4CFC8),
+                          disabledForegroundColor: Colors.white70,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
@@ -204,7 +300,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: _pickFromGallery,
+                        onPressed: _isProcessing ? null : _pickFromGallery,
                         icon: const Icon(Icons.photo_library, size: 24),
                         label: const Text(
                           'カメラロールから選択',
@@ -216,9 +312,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF9E8B7E),
+                          disabledForegroundColor: const Color(0xFFD4CFC8),
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: const BorderSide(
-                            color: Color(0xFFBCAAA4),
+                          side: BorderSide(
+                            color: _isProcessing 
+                                ? const Color(0xFFD4CFC8) 
+                                : const Color(0xFFBCAAA4),
                             width: 2,
                           ),
                           shape: RoundedRectangleBorder(
@@ -227,6 +326,43 @@ class _CaptureScreenState extends State<CaptureScreen> {
                         ),
                       ),
                     ),
+
+                    // 処理完了後の「次へ」ボタン
+                    if (_processedImageFile != null && !_isProcessing) ...[
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            // TODO: 次の画面（顔を描く画面）へ遷移
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('次の画面は開発中です'),
+                                backgroundColor: Color(0xFF9E8B7E),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.arrow_forward, size: 24),
+                          label: const Text(
+                            '次へ進む',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF9E8B7E),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            elevation: 3,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
