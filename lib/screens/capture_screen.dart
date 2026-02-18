@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import '../services/remove_bg_service.dart';
+import 'face_painting_screen.dart';
 
 class CaptureScreen extends StatefulWidget {
   const CaptureScreen({super.key});
@@ -333,14 +335,19 @@ class _CaptureScreenState extends State<CaptureScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            // TODO: 次の画面（顔を描く画面）へ遷移
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('次の画面は開発中です'),
-                                backgroundColor: Color(0xFF9E8B7E),
-                              ),
-                            );
+                          onPressed: () async {
+                            if (_processedImageFile != null) {
+                              // ファイルをバイトデータとして読み込む
+                              final Uint8List imageBytes = await _processedImageFile!.readAsBytes();
+                              if (context.mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => FacePaintingScreen(stoneImage: imageBytes),
+                                  ),
+                                );
+                              }
+                            }
                           },
                           icon: const Icon(Icons.arrow_forward, size: 24),
                           label: const Text(
